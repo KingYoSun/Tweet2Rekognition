@@ -51,7 +51,7 @@ class TweetScraper:
     #画像ありツイートをSEARCH_TEXTでSEARCHCOUNTだけ検索        
     def search(self):
         try:
-            for result in self.api.search(q='{} -filter:retweets'.format(SEARCH_TEXT), result_type='recent', count=SEARCH_COUNT):
+            for result in self.api.search(q='{} -filter:retweets filter:images'.format(SEARCH_TEXT), result_type='recent', count=SEARCH_COUNT):
                 url = 'https://twitter.com/{}/status/{}'.format(result.user.screen_name, result.id)
                 text = result.text.replace('\n', '')
                 #画像ありツイートのみ抽出

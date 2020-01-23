@@ -29,6 +29,8 @@ Resources:
     Properties:
       FunctionName: !Sub 'awscodestar-${ProjectId}-lambda-HelloWorld'
       Handler: index.handler
+      MemorySize: 128
+      Timeout: 60
       Runtime: python3.7
       Role:
         Fn::GetAtt:
