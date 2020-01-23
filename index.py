@@ -43,19 +43,26 @@ class TweetScraper:
     def search(self):
         try:
             for result in self.api.search(q='{} -filter:retweets'.format(SEARCH_TEXT), result_type='recent', count=SEARCH_COUNT):
-                url = 'https://twitter.con/{}/status/{}'.format(result.user.screen_name, result.id)
+                url = 'https://twitter.com/{}/status/{}'.format(result.user.screen_name, result.id)
                 text = result.text.replace('\n', '')
+                #画像ありツイートのみ抽出
                 if 'media' in result.entities.keys():
+                    #画像の個数
+                    num_media = len(result.extended_entities["media"])
+                    #データ入力
                     self.tweet_data.append({"id": result.id, 
-                    "user_name": result.user.name, 
-                    "user_screen_name": result.user.screen_name,
-                    "text": text,
-                    "favorite_count": result.favorite_count,
-                    "retweet_count": result.retweet_count,
-                    "created_at": result.created_at.isoformat(),
-                    "url": url,
-                    "media": result.entities['media']
+                        "user_name": result.user.name, 
+                        "user_screen_name": result.user.screen_name,
+                        "text": result.text,
+                        "favorite_count": result.favorite_count,
+                        "retweet_count": result.retweet_count,
+                        "created_at": result.created_at.isoformat(),
+                        "url": url,
+                        "media_url": []
                     })
+                    for i in range(num_media):
+                        self.tweet_data[-1]["media_url"].append(result.extended_entities["media"][i]["media_url_https"])
+                
         except Exception as e:
             print('Twitter Search Error' + str(e))
         finally:
