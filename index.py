@@ -2,7 +2,6 @@ import sys
 sys.path.append('lib/ruamel.yaml')
 sys.path.append('lib/tweepy')
 
-import os
 import boto3
 import io
 import urllib.request
