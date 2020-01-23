@@ -1,11 +1,12 @@
 import sys
 sys.path.append('lib/ruamel.yaml')
 sys.path.append('lib/tweepy')
+sys.path.append('lib/Pillow')
 
-import json
-import datetime
 import os
 import boto3
+import io
+import urllib.request
 import tweepy
 from ruamel.yaml import YAML
 
@@ -80,21 +81,32 @@ class SendRekognition:
     def __init__(self, data):
         self.data = data
         self.person_th = PERSON_THRESHOLD
-        self.image = None #画像データ
-    
-    def send(self):
+
+    def send(self, img):
         try:
-            self.response = rekognition.detect_labels(Image={"Bytes": self.image}, MaxLabels=10)
+            return rekognition.detect_labels(Image={"Bytes": img}, MaxLabels=10)
         except Exception as e:
             print('Rekognition Error' + str(e))
         finally:
             print('Finish Rekognition')
+    
+    def add_labels(self):
+        #各ツイート
+        for i in range(len(self.data)):
+            #各画像
+            for img_url in self.data[i]["media_url"]:
+                img_in = urllib.request.urlopen(img_url).read()
+                img_bin = io.BytesIO(img_in)
+                print("text={}, url={}".format(self.data[i]["text"], img_url))
+                result = self.send(img_in)
+                print(result)
     
 def handler(event, context):
     scraper = TweetScraper()
     scraper.search()
     
     rekognition = SendRekognition(scraper.tweet_data)
+    rekognition.add_labels()
     
     return{
         'isBase64Encoded': False,
