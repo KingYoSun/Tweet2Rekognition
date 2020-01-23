@@ -1,7 +1,7 @@
 import sys
 sys.path.append('lib/ruamel.yaml')
 sys.path.append('lib/tweepy')
-sys.path.append('lib/Pillow')
+sys.path.append('lib/boto3')
 
 import os
 import boto3
