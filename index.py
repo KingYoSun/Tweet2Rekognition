@@ -5,6 +5,7 @@ sys.path.append('lib/tweepy')
 import json
 import datetime
 import os
+import boto3
 import tweepy
 from ruamel.yaml import YAML
 
@@ -23,6 +24,12 @@ AS = env['TWITTER_AS']
 SEARCH_TEXT = env['SEARCH_TEXT']
 SEARCH_COUNT = env['SEARCH_COUNT']
 
+#自撮り判定設定
+PERSON_THRESHOLD = env['PERSON_THRESHOLD']
+
+#Rekognition設定
+rekognition = boto3.client('rekognition', 'ap-northeast-1')
+
 class TweetScraper:
     def __init__(self):
         self.tweet_data = []
@@ -39,7 +46,8 @@ class TweetScraper:
             self.api = None
         finally:
             print('Set Twitter API Object')
-            
+    
+    #画像ありツイートをSEARCH_TEXTでSEARCHCOUNTだけ検索        
     def search(self):
         try:
             for result in self.api.search(q='{} -filter:retweets'.format(SEARCH_TEXT), result_type='recent', count=SEARCH_COUNT):
@@ -68,14 +76,30 @@ class TweetScraper:
         finally:
             print('Finish Twitter Search')
 
+class SendRekognition:
+    def __init__(self, data):
+        self.data = data
+        self.person_th = PERSON_THRESHOLD
+        self.image = None #画像データ
+    
+    def send(self):
+        try:
+            self.response = rekognition.detect_labels(Image={"Bytes": self.image}, MaxLabels=10)
+        except Exception as e:
+            print('Rekognition Error' + str(e))
+        finally:
+            print('Finish Rekognition')
+    
 def handler(event, context):
     scraper = TweetScraper()
     scraper.search()
+    
+    rekognition = SendRekognition(scraper.tweet_data)
     
     return{
         'isBase64Encoded': False,
         'statusCode': 200,
         'headers': {},
-        'body': scraper.tweet_data
+        'body': rekognition.data
     }
     
