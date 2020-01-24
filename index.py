@@ -2,6 +2,9 @@ import sys
 sys.path.append('lib/ruamel.yaml')
 sys.path.append('lib/tweepy')
 
+import json
+from decimal import Decimal
+import datetime
 import boto3
 import io
 import urllib.request
@@ -26,8 +29,23 @@ SEARCH_COUNT = env['SEARCH_COUNT']
 #自撮り判定設定
 PERSON_THRESHOLD = env['PERSON_THRESHOLD']
 
-#Rekognition設定
-rekognition = boto3.client('rekognition', 'ap-northeast-1')
+#AWS設定
+try:
+    #DynamoDB設定
+    dynamoDB = boto3.resource('dynamodb', 'ap-northeast-1')
+    table = dynamoDB.Table("tweet2rekognition")
+    #Rekognition設定
+    rekognition = boto3.client('rekognition', 'ap-northeast-1')
+except Exception as e:
+    print('AWS Setup Error: ' + str(e))
+finally:
+    print('Finish AWS Setup')    
+
+#json.dumps時のdecimal設定
+def decimal_default_proc(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
 
 class TweetScraper:
     def __init__(self):
@@ -41,7 +59,7 @@ class TweetScraper:
             auth.set_access_token(AT, AS)
             self.api = tweepy.API(auth)
         except Exception as e:
-            print('Twitter API Setup Error' + str(e))
+            print('Twitter API Setup Error: ' + str(e))
             self.api = None
         finally:
             print('Set Twitter API Object')
@@ -57,13 +75,13 @@ class TweetScraper:
                     #画像の個数
                     num_media = len(result.extended_entities["media"])
                     #データ入力
-                    self.tweet_data.append({"id": result.id, 
+                    self.tweet_data.append({"id": str(result.id), 
                         "user_name": result.user.name, 
                         "user_screen_name": result.user.screen_name,
                         "text": result.text,
-                        "favorite_count": result.favorite_count,
-                        "retweet_count": result.retweet_count,
-                        "created_at": result.created_at.isoformat(),
+                        "favorite_count": Decimal(result.favorite_count),
+                        "retweet_count": Decimal(result.retweet_count),
+                        "created_at": Decimal(result.created_at.timestamp()),
                         "url": url,
                         "img": []
                     })
@@ -76,7 +94,7 @@ class TweetScraper:
                         })
                 
         except Exception as e:
-            print('Twitter Search Error' + str(e))
+            print('Twitter Search Error: ' + str(e))
         finally:
             print('Finish Twitter Search')
 
@@ -88,7 +106,7 @@ class SendRekognition:
         try:
             return rekognition.detect_labels(Image={"Bytes": img}, MaxLabels=10)
         except Exception as e:
-            print('Rekognition Error' + str(e))
+            print('Rekognition Error: ' + str(e))
         finally:
             print('Finish Rekognition')
     
@@ -107,8 +125,42 @@ class SendRekognition:
                         self.data[i]["img"][j]["labels"].append(label_names)
                         for b in range(len(label["Instances"])):
                             if label["Instances"][b]["Confidence"] > PERSON_THRESHOLD:
-                                self.data[i]["img"][j]["bounding_box"].append(label["Instances"][b]["BoundingBox"])
+                                #BoundingBoxをDecimal変換
+                                label["Instances"][b]["BoundingBox"]["Width"] = Decimal(label["Instances"][b]["BoundingBox"]["Width"])
+                                label["Instances"][b]["BoundingBox"]["Height"] = Decimal(label["Instances"][b]["BoundingBox"]["Height"])
+                                label["Instances"][b]["BoundingBox"]["Left"] = Decimal(label["Instances"][b]["BoundingBox"]["Left"])
+                                label["Instances"][b]["BoundingBox"]["Top"] = Decimal(label["Instances"][b]["BoundingBox"]["Top"])
+                                self.data[i]["img"][j]["bounding_box"].append((label["Instances"][b]["BoundingBox"]))
                         break
+
+class SendDynamoDB:
+    def __init__(self, data):
+        self.data = data
+        
+    def put(self):
+        try:
+            for i in range(len(self.data)):
+                img_set = [img for img in self.data[i]["img"] if img["bounding_box"] != []]
+                if img_set != []:
+                    img_set = json.dumps(img_set, default=decimal_default_proc)
+                    table.put_item(
+                        Item = {
+                            "id": self.data[i]["id"], 
+                            "user_name": self.data[i]["user_name"], 
+                            "user_screen_name": self.data[i]["user_screen_name"],
+                            "text": self.data[i]["text"],
+                            "favorite": self.data[i]["favorite_count"],
+                            "retweet": self.data[i]["retweet_count"],
+                            "timestamp": self.data[i]["created_at"],
+                            "url": self.data[i]["url"],
+                            "img": img_set
+                        }
+                    )
+        except Exception as e:
+            print('DynamoDB Error: ' + str(e))
+        finally:
+            print('Finish putting DynamoDB')
+            
     
 def handler(event, context):
     scraper = TweetScraper()
@@ -116,6 +168,8 @@ def handler(event, context):
     
     rekognition = SendRekognition(scraper.tweet_data)
     rekognition.add_labels()
+    send_dynamoDB = SendDynamoDB(rekognition.data)
+    send_dynamoDB.put()
     
     return{
         'isBase64Encoded': False,
