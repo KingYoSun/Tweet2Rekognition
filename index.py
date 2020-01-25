@@ -73,7 +73,7 @@ class TweetScraper:
                     #画像の個数
                     num_media = len(result.extended_entities["media"])
                     #データ入力
-                    self.tweet_data.append({"id": str(result.id), 
+                    self.tweet_data.append({"id": Decimal(result.id), 
                         "user_name": result.user.name, 
                         "user_screen_name": result.user.screen_name,
                         "text": result.text,
