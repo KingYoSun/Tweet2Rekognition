@@ -96,11 +96,6 @@ class TweetScraper:
         finally:
             print('Finish Twitter Search')
 
-class LoadDynamoDB:
-    def __init__(self, data):
-        self.data = data
-    
-
 class SendRekognition:
     def __init__(self, data):
         self.data = data
