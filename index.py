@@ -21,7 +21,7 @@ AT = twitter["TWITTER_AT"]
 AS = twitter["TWITTER_AS"]
 
 #検索設定
-SEARCH_TEXT = "VRC VRChat"
+SEARCH_TEXT = "(VRC OR VRChat OR #バーチャルストリート OR #VirtualStreet)"
 SEARCH_COUNT = 100
 
 #自撮り判定設定
@@ -95,6 +95,11 @@ class TweetScraper:
             print('Twitter Search Error: ' + str(e))
         finally:
             print('Finish Twitter Search')
+
+class LoadDynamoDB:
+    def __init__(self, data):
+        self.data = data
+    
 
 class SendRekognition:
     def __init__(self, data):
