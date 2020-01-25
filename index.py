@@ -2,32 +2,30 @@ import sys
 sys.path.append('lib/ruamel.yaml')
 sys.path.append('lib/tweepy')
 
+import boto3
 import json
 from decimal import Decimal
 import datetime
-import boto3
 import io
 import urllib.request
 import tweepy
-from ruamel.yaml import YAML
 
-#Load Key and Token
-with open('secret.yml') as file:
-    yaml = YAML(typ='safe')
-    env = yaml.load(file)
+#Secret ManagerからTWITTER API KeyとTokenを取得
+import twitterAPI
 
 #Twitterの認証 
-CK = env['TWITTER_CK']
-CS = env['TWITTER_CS']
-AT = env['TWITTER_AT']
-AS = env['TWITTER_AS']
+twitter = json.loads(twitterAPI.get_secret())
+CK = twitter["TWITTER_CK"]
+CS = twitter["TWITTER_CS"]
+AT = twitter["TWITTER_AT"]
+AS = twitter["TWITTER_AS"]
 
 #検索設定
-SEARCH_TEXT = env['SEARCH_TEXT']
-SEARCH_COUNT = env['SEARCH_COUNT']
+SEARCH_TEXT = "VRC VRChat"
+SEARCH_COUNT = 100
 
 #自撮り判定設定
-PERSON_THRESHOLD = env['PERSON_THRESHOLD']
+PERSON_THRESHOLD = 75
 
 #AWS設定
 try:
