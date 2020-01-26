@@ -42,6 +42,13 @@ def get_tweet_id(table, tweet_id):
             ScanIndexForward = True,
             Limit = 1
         )
+        #最新日で検索して見つからない場合は前日の分も検索
+        if len(queryData["Items"]) == 0:
+            queryData = table.query(
+            KeyConditionExpression = Key('updated_at_date').eq(last_day) & Key('id').eq(tweet_id),
+            ScanIndexForward = True,
+            Limit = 1
+            )
         return queryData["Items"]
     except Exception as e:
         print('Tweet is not exist: ' + str(e))

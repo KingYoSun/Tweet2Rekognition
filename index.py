@@ -120,12 +120,13 @@ class SendRekognition:
     def add_labels(self):
         try:
             #各ツイート
-            labeling_count = 0
+            new_tweet_count = 0
+            update_tweet_count = 0
             latest_tweet_id = 0
             for i in range(len(self.data)):
+                scanned_tweet = functions.get_tweet_id(table, self.data[i]["id"])
                 #ツイート（ID)が既に存在する場合scaned_tweetに入る
                 if latest_tweet_id == 0:
-                    scanned_tweet = functions.get_tweet_id(table, self.data[i]["id"])
                     #dataのツイートは新しい順なので、get_tweet_idにヒットした場合以降のツイートは全て検索済みになる
                     if len(scanned_tweet) == 1:
                         latest_tweet_id = int(scanned_tweet[0]["id"])
@@ -139,17 +140,16 @@ class SendRekognition:
                             img_bin = io.BytesIO(img_in)
                             result = self.send(img_in)
                             self.checking_img(i, j, result["Labels"])
-                        print("Labeled")
+                        if len(self.data[i]["img"]) > 0:
+                            new_tweet_count += 1
                 else:
-                    if len(scanned_tweet) == 0:
-                        print("Labeling Skipped")
-                    else:
+                    if len(scanned_tweet) > 0:
                         self.data[i]["img"] = json.loads(scanned_tweet[0]["img"])
-                        print("Labeling Skipped and assign img")
+                        update_tweet_count +=1
         except Exception as e:
             print("Add Labels Error: " +str(e))
         finally:
-            print("Finish Labeling")
+            print("Finish Labeling, Add {} Tweet, Update {} Tweet".format(new_tweet_count, update_tweet_count))
 
 #DynamoDBにデータを送信
 class SendDynamoDB:
@@ -198,10 +198,10 @@ def handler(event, context):
     send_dynamoDB.put()
     
     #Appear rekognition.data
-    return{
-        'isBase64Encoded': False,
-        'statusCode': 200,
-        'headers': {},
-        'body': rekognition.data
-    }
+    #return{
+    #    'isBase64Encoded': False,
+    #    'statusCode': 200,
+    #    'headers': {},
+    #    'body': rekognition.data
+    #}
     
