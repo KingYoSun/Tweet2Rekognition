@@ -7,7 +7,47 @@
 import boto3
 import base64
 from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key
+from decimal import Decimal, ROUND_DOWN
+import datetime
 
+#Decimal型で返す
+def return_decimal(num):
+    return Decimal(num)
+
+#json.dumps時のdecimal設定
+def decimal_default_proc(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
+
+#更新日時、時刻の取得
+def get_update_at():
+    today = datetime.date.today()
+    today_obj = datetime.datetime.combine(today, datetime.time())
+    updated_at_date = Decimal(today_obj.timestamp())
+    current_time = datetime.datetime.now()
+    current_time_for_unix = datetime.datetime(1970, 1, 1, hour=current_time.hour, minute=current_time.minute, second=current_time.second, microsecond=current_time.microsecond)
+    updated_at_time = Decimal(current_time_for_unix.timestamp()).quantize(Decimal('0'), rounding=ROUND_DOWN)
+    return {"datetime_str": str(current_time), "updated_at_date": updated_at_date, "updated_at_time": updated_at_time}
+    
+#指定のツイートIDを取得
+def get_tweet_id(table, tweet_id):
+    try:
+        updated_at = get_update_at()
+        today = updated_at["updated_at_date"]
+        last_day = today - Decimal(60*60*24) #60*60*24はUnix時刻で一日分
+        queryData = table.query(
+            KeyConditionExpression = Key('updated_at_date').eq(today) & Key('id').eq(tweet_id),
+            ScanIndexForward = True,
+            Limit = 1
+        )
+        return queryData["Items"]
+    except Exception as e:
+        print('Tweet is not exist: ' + str(e))
+        return None
+
+#SecretsManegerからTwitter API KeyとTokenを入手
 def get_secret():
 
     secret_name = "TWITTER_API_FOR_SEARCH"

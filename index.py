@@ -3,19 +3,17 @@ sys.path.append('lib/ruamel.yaml')
 sys.path.append('lib/tweepy')
 
 import boto3
-from boto3.dynamodb.conditions import Key
 import json
-from decimal import Decimal, ROUND_DOWN
-import datetime
 import io
 import urllib.request
 import tweepy
+import datetime
 
-#Secret ManagerからTWITTER API KeyとTokenを取得
-import twitterAPI
+#自作関数
+import functions
 
 #Twitterの認証 
-twitter = json.loads(twitterAPI.get_secret())
+twitter = json.loads(functions.get_secret())
 CK = twitter["TWITTER_CK"]
 CS = twitter["TWITTER_CS"]
 AT = twitter["TWITTER_AT"]
@@ -38,28 +36,9 @@ try:
 except Exception as e:
     print('AWS Setup Error: ' + str(e))
 finally:
-    print('Finish AWS Setup')    
+    print('Finish AWS Setup')
 
-#json.dumps時のdecimal設定
-def decimal_default_proc(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    raise TypeError
-
-#指定のツイートIDを取得
-def get_tweet_id(tweet_id):
-    try:
-        past_10_minute = Decimal((datetime.datetime.now() - datetime.timedelta(minutes=10)).timestamp())
-        queryData = table.query(
-            KeyConditionExpression = Key('id').eq(tweet_id),
-            ScanIndexForward = True,
-            Limit = 1
-        )
-        return queryData["Items"]
-    except Exception as e:
-        print('Tweet is not exist: ' + str(e))
-        return None
-
+#Twitterのスクレイピング
 class TweetScraper:
     def __init__(self):
         self.tweet_data = []
@@ -88,13 +67,13 @@ class TweetScraper:
                     #画像の個数
                     num_media = len(result.extended_entities["media"])
                     #データ入力
-                    self.tweet_data.append({"id": Decimal(result.id), 
+                    self.tweet_data.append({"id": functions.return_decimal(result.id), 
                         "user_name": result.user.name, 
                         "user_screen_name": result.user.screen_name,
                         "text": result.text,
-                        "favorite_count": Decimal(result.favorite_count),
-                        "retweet_count": Decimal(result.retweet_count),
-                        "created_at": Decimal(result.created_at.timestamp()),
+                        "favorite_count": functions.return_decimal(result.favorite_count),
+                        "retweet_count": functions.return_decimal(result.retweet_count),
+                        "created_at": functions.return_decimal(result.created_at.timestamp()),
                         "url": url,
                         "img": []
                     })
@@ -111,6 +90,7 @@ class TweetScraper:
         finally:
             print('Finish Twitter Search')
 
+#Rekognitionでラベル付け
 class SendRekognition:
     def __init__(self, data):
         self.data = data
@@ -130,10 +110,10 @@ class SendRekognition:
                 for b in range(len(label["Instances"])):
                     if label["Instances"][b]["Confidence"] > PERSON_THRESHOLD:
                         #BoundingBoxをDecimal変換
-                        label["Instances"][b]["BoundingBox"]["Width"] = Decimal(label["Instances"][b]["BoundingBox"]["Width"])
-                        label["Instances"][b]["BoundingBox"]["Height"] = Decimal(label["Instances"][b]["BoundingBox"]["Height"])
-                        label["Instances"][b]["BoundingBox"]["Left"] = Decimal(label["Instances"][b]["BoundingBox"]["Left"])
-                        label["Instances"][b]["BoundingBox"]["Top"] = Decimal(label["Instances"][b]["BoundingBox"]["Top"])
+                        label["Instances"][b]["BoundingBox"]["Width"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Width"])
+                        label["Instances"][b]["BoundingBox"]["Height"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Height"])
+                        label["Instances"][b]["BoundingBox"]["Left"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Left"])
+                        label["Instances"][b]["BoundingBox"]["Top"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Top"])
                         self.data[i]["img"][j]["bounding_box"].append((label["Instances"][b]["BoundingBox"]))
                 break
     
@@ -141,25 +121,37 @@ class SendRekognition:
         try:
             #各ツイート
             labeling_count = 0
+            latest_tweet_id = 0
             for i in range(len(self.data)):
                 #ツイート（ID)が既に存在する場合scaned_tweetに入る
-                scanned_tweet = get_tweet_id(self.data[i]["id"])
-                if scanned_tweet == [] or scanned_tweet is None:
-                    #各ツイート内の各画像
-                    for j in range(len(self.data[i]["img"])):
-                        img_in = urllib.request.urlopen(self.data[i]["img"][j]["url"]).read()
-                        img_bin = io.BytesIO(img_in)
-                        result = self.send(img_in)
-                        self.checking_img(i, j, result["Labels"])
+                if latest_tweet_id == 0:
+                    scanned_tweet = functions.get_tweet_id(table, self.data[i]["id"])
+                    #dataのツイートは新しい順なので、get_tweet_idにヒットした場合以降のツイートは全て検索済みになる
+                    if len(scanned_tweet) == 1:
+                        latest_tweet_id = int(scanned_tweet[0]["id"])
+                        print("latest_tweet_id: {}".format(latest_tweet_id))
+                    
+                if self.data[i]["id"] > latest_tweet_id:
+                    if len(scanned_tweet) == 0:
+                        #各ツイート内の各画像
+                        for j in range(len(self.data[i]["img"])):
+                            img_in = urllib.request.urlopen(self.data[i]["img"][j]["url"]).read()
+                            img_bin = io.BytesIO(img_in)
+                            result = self.send(img_in)
+                            self.checking_img(i, j, result["Labels"])
+                        print("Labeled")
                 else:
-                    #dataのツイートは新しい順なので、get_tweet_idにヒットした場合以降のツイートは全て検索済みになる。よってbreak
-                    print("Labeling Skipped")
-                    break
+                    if len(scanned_tweet) == 0:
+                        print("Labeling Skipped")
+                    else:
+                        self.data[i]["img"] = json.loads(scanned_tweet[0]["img"])
+                        print("Labeling Skipped and assign img")
         except Exception as e:
             print("Add Labels Error: " +str(e))
         finally:
             print("Finish Labeling")
 
+#DynamoDBにデータを送信
 class SendDynamoDB:
     def __init__(self, data):
         self.data = data
@@ -167,12 +159,12 @@ class SendDynamoDB:
     def put(self):
         try:
             count = 0 # NewTweetCount
+            updated_at = functions.get_update_at()
             for i in range(len(self.data)):
                 #SendRekognition.checking_imgで除外された画像を除く画像セット（各ツイート）
                 img_set = [img for img in self.data[i]["img"] if img["bounding_box"] != []]
                 if img_set != []:
-                    count += 1
-                    img_set = json.dumps(img_set, default=decimal_default_proc)
+                    img_set = json.dumps(img_set, default=functions.decimal_default_proc)
                     table.put_item(
                         Item = {
                             "id": self.data[i]["id"], 
@@ -182,11 +174,14 @@ class SendDynamoDB:
                             "favorite": self.data[i]["favorite_count"],
                             "retweet": self.data[i]["retweet_count"],
                             "timestamp": self.data[i]["created_at"],
-                            "updated_at": Decimal(datetime.datetime.now().timestamp()).quantize(Decimal('0'), rounding=ROUND_DOWN),
+                            "updated_at_str": updated_at["datetime_str"],
+                            "updated_at_date": updated_at["updated_at_date"],
+                            "updated_at_time": updated_at["updated_at_time"],
                             "url": self.data[i]["url"],
                             "img": img_set
                         }
                     )
+                    count += 1
         except Exception as e:
             print('DynamoDB Error: ' + str(e))
         finally:
@@ -203,10 +198,10 @@ def handler(event, context):
     send_dynamoDB.put()
     
     #Appear rekognition.data
-    #return{
-    #    'isBase64Encoded': False,
-    #    'statusCode': 200,
-    #    'headers': {},
-    #    'body': rekognition.data
-    #}
+    return{
+        'isBase64Encoded': False,
+        'statusCode': 200,
+        'headers': {},
+        'body': rekognition.data
+    }
     
