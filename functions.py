@@ -72,6 +72,7 @@ def get_secret():
     # We rethrow the exception by default.
 
     try:
+        global get_secret_value_response
         get_secret_value_response = client.get_secret_value(
             SecretId=secret_name
         )
