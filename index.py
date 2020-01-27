@@ -103,10 +103,11 @@ class SendRekognition:
     
     def checking_img(self, i, j, labels):
         label_names = [l["Name"] for l in labels] #ラベル名（Key）のリスト
+        keyword_set = ["Clothing", "Fashion", "Apparel", "Accessories", "Accessory"]
         for label in labels:
-            # labelが"Name": "Person"を持ち、ConfidenceがPERSON_THRESHOLDを超え、かつBoundingBoxを持つ場合
-            if "Person" in label["Name"] and label["Confidence"] > PERSON_THRESHOLD and len(label["Instances"]) > 0 and "BoundingBox" in [b for b in label["Instances"][0]]:
-                self.data[i]["img"][j]["labels"].append(label_names)
+            # labelが"Name": "Person"を持ち、ConfidenceがPERSON_THRESHOLDを超え、keyword_setうちどれかをラベルに持ち、かつBoundingBoxを持つ場合
+            if "Person" in label_names and label["Confidence"] > PERSON_THRESHOLD and (len(set(label_names) & set(keyword_set)) != 0) and len(label["Instances"]) > 0 and "BoundingBox" in [b for b in label["Instances"][0]]:
+                self.data[i]["img"][j]["labels"] = label_names
                 for b in range(len(label["Instances"])):
                     if label["Instances"][b]["Confidence"] > PERSON_THRESHOLD:
                         #BoundingBoxをDecimal変換
