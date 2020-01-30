@@ -160,6 +160,7 @@ class SendDynamoDB:
         try:
             count = 0 # NewTweetCount
             updated_at = functions.get_update_at()
+            next_month = functions.get_one_month_later()
             for i in range(len(self.data)):
                 #SendRekognition.checking_imgで除外された画像を除く画像セット（各ツイート）
                 img_set = [img for img in self.data[i]["img"] if img["bounding_box"] != []]
@@ -177,6 +178,7 @@ class SendDynamoDB:
                             "updated_at_str": updated_at["datetime_str"],
                             "updated_at_date": updated_at["updated_at_date"],
                             "updated_at_time": updated_at["updated_at_time"],
+                            "time_to_live": next_month,
                             "url": self.data[i]["url"],
                             "img": img_set
                         }

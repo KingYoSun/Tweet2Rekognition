@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal, ROUND_DOWN
 import datetime
+from dateutil.relativedelta import relativedelta
 
 #Decimal型で返す
 def return_decimal(num):
@@ -21,11 +22,22 @@ def decimal_default_proc(obj):
         return float(obj)
     raise TypeError
 
+def date_to_unix(date):
+    date_to_datetime = datetime.datetime.combine(date, datetime.time())
+    date_to_unix = date_to_datetime.timestamp()
+    unix_convert_decimal = Decimal(date_to_unix)
+    return unix_convert_decimal
+    
+def get_one_month_later():
+    today = datetime.date.today()
+    one_month_later = today + relativedelta(months=1)
+    one_month_later_convert = date_to_unix(one_month_later)
+    return one_month_later_convert
+    
 #更新日時、時刻の取得
 def get_update_at():
     today = datetime.date.today()
-    today_obj = datetime.datetime.combine(today, datetime.time())
-    updated_at_date = Decimal(today_obj.timestamp())
+    updated_at_date = date_to_unix(today)
     current_time = datetime.datetime.now()
     current_time_for_unix = datetime.datetime(1970, 1, 1, hour=current_time.hour, minute=current_time.minute, second=current_time.second, microsecond=current_time.microsecond)
     updated_at_time = Decimal(current_time_for_unix.timestamp()).quantize(Decimal('0'), rounding=ROUND_DOWN)
