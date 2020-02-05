@@ -34,6 +34,12 @@ def get_one_month_later():
     one_month_later_convert = date_to_unix(one_month_later)
     return one_month_later_convert
     
+def get_three_days_after():
+    today = datetime.date.today()
+    three_days_after = today + relativedelta(days=2)
+    three_days_after_convert = date_to_unix(three_days_after)
+    return three_days_after_convert
+
 #更新日時、時刻の取得
 def get_update_at():
     today = datetime.date.today()
@@ -51,20 +57,36 @@ def get_tweet_id(table, tweet_id):
         last_day = today - Decimal(60*60*24) #60*60*24はUnix時刻で一日分
         queryData = table.query(
             KeyConditionExpression = Key('updated_at_date').eq(today) & Key('id').eq(tweet_id),
-            ScanIndexForward = True,
+            ScanIndexForward = False,
             Limit = 1
         )
         #最新日で検索して見つからない場合は前日の分も検索
         if len(queryData["Items"]) == 0:
             queryData = table.query(
             KeyConditionExpression = Key('updated_at_date').eq(last_day) & Key('id').eq(tweet_id),
-            ScanIndexForward = True,
+            ScanIndexForward = False,
             Limit = 1
             )
         return queryData["Items"]
     except Exception as e:
         print('Tweet is not exist: ' + str(e))
         return None
+
+#前回までに保存した最後のツイートを取得
+def get_latest_tweet_id(table):
+    try:
+        updated_at = get_update_at()
+        today = updated_at["updated_at_date"]
+        last_day = today - Decimal(60*60*24) #60*60*24はUnix時刻で一日分
+        queryData = table.query(
+        KeyConditionExpression = Key('last_tweet').eq(1) & Key('timestamp').gt(last_day),
+        ScanIndexForward = False,
+        Limit = 1
+        )
+        return queryData["Items"]
+    except Exception as e:
+        print('tweet is not exist in history: ' + str(e))
+        return []
 
 #SecretsManegerからTwitter API KeyとTokenを入手
 def get_secret():

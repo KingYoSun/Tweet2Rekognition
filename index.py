@@ -30,10 +30,11 @@ try:
     #DynamoDB設定
     dynamoDB = boto3.resource('dynamodb', 'ap-northeast-1')
     table = dynamoDB.Table("tweet2rekognition")
+    history_table = dynamoDB.Table("tweet2rekognition_history")
     #Rekognition設定
     rekognition = boto3.client('rekognition', 'ap-northeast-1')
 except Exception as e:
-    print('AWS Setup Error: ' + str(e))
+    raise('AWS Setup Error: ' + str(e))
 finally:
     print('Finish AWS Setup')
 
@@ -50,8 +51,7 @@ class TweetScraper:
             auth.set_access_token(AT, AS)
             self.api = tweepy.API(auth)
         except Exception as e:
-            print('Twitter API Setup Error: ' + str(e))
-            self.api = None
+            raise('Twitter API Setup Error: ' + str(e))
         finally:
             print('Set Twitter API Object')
     
@@ -122,27 +122,23 @@ class SendRekognition:
             #各ツイート
             new_tweet_count = 0
             update_tweet_count = 0
-            latest_tweet_id = 0
+            
+            #DynamoDBで最新のツイートIDを取得
+            latest_tweet = functions.get_latest_tweet_id(history_table)
+            latest_tweet_id = int(latest_tweet[0]["id"]) if len(latest_tweet) > 0 else 0
+            print("latest_tweet_id: {}".format(latest_tweet_id))
             for i in range(len(self.data)):
-                scanned_tweet = functions.get_tweet_id(table, self.data[i]["id"])
-                #ツイート（ID)が既に存在する場合scaned_tweetに入る
-                if latest_tweet_id == 0:
-                    #dataのツイートは新しい順なので、get_tweet_idにヒットした場合以降のツイートは全て検索済みになる
-                    if len(scanned_tweet) == 1:
-                        latest_tweet_id = int(scanned_tweet[0]["id"])
-                        print("latest_tweet_id: {}".format(latest_tweet_id))
-                    
                 if self.data[i]["id"] > latest_tweet_id:
-                    if len(scanned_tweet) == 0:
-                        #各ツイート内の各画像
-                        for j in range(len(self.data[i]["img"])):
-                            img_in = urllib.request.urlopen(self.data[i]["img"][j]["url"]).read()
-                            img_bin = io.BytesIO(img_in)
-                            result = self.send(img_in)
-                            self.checking_img(i, j, result["Labels"])
-                        if len(self.data[i]["img"]) > 0:
-                            new_tweet_count += 1
+                    #各ツイート内の各画像
+                    for j in range(len(self.data[i]["img"])):
+                        img_in = urllib.request.urlopen(self.data[i]["img"][j]["url"]).read()
+                        img_bin = io.BytesIO(img_in)
+                        result = self.send(img_in)
+                        self.checking_img(i, j, result["Labels"])
+                    if len(self.data[i]["img"]) > 0:
+                        new_tweet_count += 1
                 else:
+                    scanned_tweet = functions.get_tweet_id(table, self.data[i]["id"])
                     if len(scanned_tweet) > 0:
                         self.data[i]["img"] = json.loads(scanned_tweet[0]["img"])
                         update_tweet_count +=1
@@ -160,8 +156,22 @@ class SendDynamoDB:
         try:
             count = 0 # NewTweetCount
             updated_at = functions.get_update_at()
+            three_days_after = functions.get_three_days_after()
             next_month = functions.get_one_month_later()
             for i in range(len(self.data)):
+                #取得したツイートで最新のものをHistoryテーブルに保存
+                if i == 0:
+                    history_table.put_item(
+                        Item = {
+                            "last_tweet": functions.return_decimal(1),
+                            "id": self.data[i]["id"], 
+                            "timestamp": self.data[i]["created_at"],
+                            "updated_at_str": updated_at["datetime_str"],
+                            "updated_at_date": updated_at["updated_at_date"],
+                            "updated_at_time": updated_at["updated_at_time"],
+                            "time_to_live": three_days_after,
+                        }
+                    )
                 #SendRekognition.checking_imgで除外された画像を除く画像セット（各ツイート）
                 img_set = [img for img in self.data[i]["img"] if img["bounding_box"] != []]
                 if img_set != []:
@@ -206,4 +216,3 @@ def handler(event, context):
     #    'headers': {},
     #    'body': rekognition.data
     #}
-    
