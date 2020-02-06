@@ -19,7 +19,7 @@ AT = twitter["TWITTER_AT"]
 AS = twitter["TWITTER_AS"]
 
 #検索設定
-SEARCH_TEXT = "(VRC OR VRChat OR #バーチャルストリート OR #VirtualStreet)"
+SEARCH_TEXT = "(#VRC OR #VRChat OR #バーチャルストリート OR #VirtualStreet)"
 SEARCH_COUNT = 100
 
 #自撮り判定設定
