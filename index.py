@@ -104,19 +104,21 @@ class SendRekognition:
     def checking_img(self, i, j, labels):
         label_names = [l["Name"] for l in labels] #ラベル名（Key）のリスト
         keyword_set = ["Clothing", "Fashion", "Apparel", "Accessories", "Accessory"]
-        for label in labels:
-            # labelが"Name": "Person"を持ち、ConfidenceがPERSON_THRESHOLDを超え、keyword_setうちどれかをラベルに持ち、かつBoundingBoxを持つ場合
-            if "Person" in label_names and label["Confidence"] > PERSON_THRESHOLD and (len(set(label_names) & set(keyword_set)) != 0) and len(label["Instances"]) > 0 and "BoundingBox" in [b for b in label["Instances"][0]]:
-                self.data[i]["img"][j]["labels"] = label_names
-                for b in range(len(label["Instances"])):
-                    if label["Instances"][b]["Confidence"] > PERSON_THRESHOLD:
-                        #BoundingBoxをDecimal変換
-                        label["Instances"][b]["BoundingBox"]["Width"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Width"])
-                        label["Instances"][b]["BoundingBox"]["Height"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Height"])
-                        label["Instances"][b]["BoundingBox"]["Left"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Left"])
-                        label["Instances"][b]["BoundingBox"]["Top"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Top"])
-                        self.data[i]["img"][j]["bounding_box"].append((label["Instances"][b]["BoundingBox"]))
-                break
+        # labelが"Name": "Person"を持ち、keyword_setのうちどれかをラベルに持つ場合
+        if "Person" in label_names and (len(set(label_names) & set(keyword_set)) != 0):
+            for label in labels:
+                # Nameが"Person"でかつ、ConfidenceがPERSON_THRESHOLDを超え、BoundingBoxを持つ場合
+                if label["Name"] == "Person" and label["Confidence"] > PERSON_THRESHOLD and len(label["Instances"]) > 0 and "BoundingBox" in [b for b in label["Instances"][0]]:
+                    self.data[i]["img"][j]["labels"] = label_names
+                    for b in range(len(label["Instances"])):
+                        if label["Instances"][b]["Confidence"] > PERSON_THRESHOLD:
+                            #BoundingBoxをDecimal変換
+                            label["Instances"][b]["BoundingBox"]["Width"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Width"])
+                            label["Instances"][b]["BoundingBox"]["Height"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Height"])
+                            label["Instances"][b]["BoundingBox"]["Left"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Left"])
+                            label["Instances"][b]["BoundingBox"]["Top"] = functions.return_decimal(label["Instances"][b]["BoundingBox"]["Top"])
+                            self.data[i]["img"][j]["bounding_box"].append((label["Instances"][b]["BoundingBox"]))
+                    break
     
     def add_labels(self):
         try:
