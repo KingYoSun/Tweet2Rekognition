@@ -31,6 +31,7 @@ try:
     dynamoDB = boto3.resource('dynamodb', 'ap-northeast-1')
     table = dynamoDB.Table("tweet2rekognition")
     history_table = dynamoDB.Table("tweet2rekognition_history")
+    user_table = dynamoDB.Table("tweet2rekognition_user")
     #Rekognition設定
     rekognition = boto3.client('rekognition', 'ap-northeast-1')
 except Exception as e:
@@ -70,6 +71,11 @@ class TweetScraper:
                         "user_name": result.user.name, 
                         "user_screen_name": result.user.screen_name,
                         "user_profile_image": result.user.profile_image_url_https,
+                        "user_profile_banner": result.user._json.get("profile_banner_url"),
+                        "user_profile_description": result.user.description,
+                        "user_profile_url": result.user.url,
+                        "user_profile_follow_count": result.user.friends_count,
+                        "user_profile_follower_count": result.user.followers_count,
                         "text": result.text,
                         "favorite_count": functions.return_decimal(result.favorite_count),
                         "retweet_count": functions.return_decimal(result.retweet_count),
@@ -179,6 +185,7 @@ class SendDynamoDB:
                 img_set = [img for img in self.data[i]["img"] if img["bounding_box"] != []]
                 if img_set != []:
                     img_set = json.dumps(img_set, default=functions.decimal_default_proc)
+                    #ツイート情報をDynamoDBにput
                     table.put_item(
                         Item = {
                             "id": self.data[i]["id"], 
@@ -195,6 +202,19 @@ class SendDynamoDB:
                             "time_to_live": next_month,
                             "url": self.data[i]["url"],
                             "img": img_set
+                        }
+                    )
+                    #ユーザー情報をDynamoDBにput
+                    user_table.put_item(
+                        Item = {
+                            "user_name": self.data[i]["user_name"], 
+                            "user_screen_name": self.data[i]["user_screen_name"],
+                            "user_profile_image": self.data[i]["user_profile_image"],
+                            "user_profile_banner": self.data[i]["user_profile_banner"],
+                            "user_profile_description": self.data[i]["user_profile_description"],
+                            "user_profile_url": self.data[i]["user_profile_url"],
+                            "user_profile_follow_count": self.data[i]["user_profile_follow_count"],
+                            "user_profile_follower_count": self.data[i]["user_profile_follower_count"],
                         }
                     )
                     count += 1
