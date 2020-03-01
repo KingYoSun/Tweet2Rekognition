@@ -77,8 +77,13 @@ class TweetScraper:
                         "user_profile_follow_count": result.user.friends_count,
                         "user_profile_follower_count": result.user.followers_count,
                         "text": result.text,
+                        "hour_count": 0,
                         "favorite_count": functions.return_decimal(result.favorite_count),
+                        "past_favorite": 0,
+                        "d_fav": 0,
                         "retweet_count": functions.return_decimal(result.retweet_count),
+                        "past_retweet": 0,
+                        "d_RT": 0,
                         "created_at": functions.return_decimal(result.created_at.timestamp()),
                         "url": url,
                         "img": []
@@ -147,9 +152,26 @@ class SendRekognition:
                     if len(self.data[i]["img"]) > 0:
                         new_tweet_count += 1
                 else:
+                    #取得済みツイートの場合
                     scanned_tweet = functions.get_tweet_id(table, self.data[i]["id"])
                     if len(scanned_tweet) > 0:
                         self.data[i]["img"] = json.loads(scanned_tweet[0]["img"])
+                        #d_fav, d_RTの計算
+                        self.data[i]["hour_count"] = scanned_tweet[0].get("hour_count", 0)
+                        self.data[i]["past_favorite"] = scanned_tweet[0].get("past_favorite", 0)
+                        self.data[i]["d_fav"] = scanned_tweet[0].get("d_fav", 0)
+                        self.data[i]["past_retweet"] = scanned_tweet[0].get("past_retweet", 0)
+                        self.data[i]["d_RT"] = scanned_tweet[0].get("d_RT", 0)
+                        #毎時の判定（このlambda functionは10分おきに起動）
+                        if self.data[i]["hour_count"] == 6:
+                            self.data[i]["d_fav"] = self.data[i]["favorite_count"] - self.data[i]["past_favorite"]
+                            self.data[i]["past_favorite"] = self.data[i]["favorite_count"]
+                            self.data[i]["d_RT"] = self.data[i]["retweet_count"] - self.data[i]["past_retweet"]
+                            self.data[i]["past_retweet"] = self.data[i]["retweet_count"]
+                            self.data[i]["hour_count"] = 0
+                        else:
+                            #hour_countのカウントアップ
+                            self.data[i]["hour_count"] += 1
                         update_tweet_count +=1
         except Exception as e:
             print("Add Labels Error: " +str(e))
@@ -193,8 +215,13 @@ class SendDynamoDB:
                             "user_screen_name": self.data[i]["user_screen_name"],
                             "user_profile_image": self.data[i]["user_profile_image"],
                             "text": self.data[i]["text"],
+                            "hour_count": self.data[i]["hour_count"],
                             "favorite": self.data[i]["favorite_count"],
+                            "past_favorite": self.data[i]["past_favorite"],
+                            "d_fav": self.data[i]["d_fav"],
                             "retweet": self.data[i]["retweet_count"],
+                            "past_retweet": self.data[i]["past_retweet"],
+                            "d_RT": self.data[i]["d_RT"],
                             "timestamp": self.data[i]["created_at"],
                             "updated_at_str": updated_at["datetime_str"],
                             "updated_at_date": updated_at["updated_at_date"],
