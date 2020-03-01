@@ -242,6 +242,7 @@ class SendDynamoDB:
                             "user_profile_url": self.data[i]["user_profile_url"],
                             "user_profile_follow_count": self.data[i]["user_profile_follow_count"],
                             "user_profile_follower_count": self.data[i]["user_profile_follower_count"],
+                            "time_to_live": next_month
                         }
                     )
                     count += 1
