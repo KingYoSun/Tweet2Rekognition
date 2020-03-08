@@ -234,6 +234,7 @@ class SendDynamoDB:
                     #ユーザー情報をDynamoDBにput
                     user_table.put_item(
                         Item = {
+                            "div": 1,
                             "user_name": self.data[i]["user_name"], 
                             "user_screen_name": self.data[i]["user_screen_name"],
                             "user_profile_image": self.data[i]["user_profile_image"],
