@@ -3,7 +3,7 @@ Tweet2Rekogniton (and Store DynamoDB)
 
 Overview
 -----------
-Get tweets that include images and send AWS Rekognition to label images, finally, store tweets include labels to DynamoDB. 
+Get tweets that include images and send AWS Rekognition to label images, finally, store tweets include labels to DynamoDB 
 
 Description
 -----------
